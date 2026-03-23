@@ -1,12 +1,17 @@
 #pragma once
 
 #include "concurrency/OSThread.h"
+#include "variant.h"
 
 #if defined(HELTEC_MESH_NODE_T114)
 //this pin seems free on the T114, change it accordingly on your use cases
 #define SOS_BUZZ_PIN 33
 #endif
 
+
+#if defined(TBEAM_1WATT)
+#define SOS_BUZZ_PIN 41
+#endif
 
 #ifdef SOS_BUZZ_PIN
 

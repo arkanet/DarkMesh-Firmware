@@ -5,6 +5,7 @@
 #define I2C_SDA 8
 #define I2C_SCL 9
 #define HW_VENDOR meshtastic_HardwareModel_PRIVATE_HW
+#define TBEAM_1WATT
 
 // GPS - Quectel L76K
 #define GPS_RX_PIN 5
