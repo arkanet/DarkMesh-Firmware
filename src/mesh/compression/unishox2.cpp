@@ -1426,7 +1426,8 @@ int unishox2_decompress(const char *in, int len, UNISHOX_API_OUT_AND_LEN(char *o
 }
 
 // Main API function. See unishox2.h for documentation
-int unishox2_decompress_simple(const char *in, int len, char *out)
-{
-    return unishox2_decompress(in, len, UNISHOX_API_OUT_AND_LEN(out, INT_MAX - 1), USX_PSET_DFLT);
-}
+// DO not use it -> https://github.com/meshtastic/firmware/issues/3841
+// int unishox2_decompress_simple(const char *in, int len, char *out)
+// {
+//     return unishox2_decompress(in, len, UNISHOX_API_OUT_AND_LEN(out, INT_MAX - 1), USX_PSET_DFLT);
+// }
