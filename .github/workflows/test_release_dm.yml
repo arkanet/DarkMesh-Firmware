@@ -1,0 +1,199 @@
+name: Test Release DarkMesh Firmware
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      esp32s3: ${{ steps.gen-matrix.outputs.esp32s3 }}
+      nrf52840: ${{ steps.gen-matrix.outputs.nrf52840 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate build matrix
+        id: gen-matrix
+        run: |
+          ESP32S3_BOARDS=$(./bin/generate_ci_matrix.py esp32s3)
+          NRF52_BOARDS=$(./bin/generate_ci_matrix.py nrf52840)
+          echo "esp32s3=$(jq -cn --argjson boards "$ESP32S3_BOARDS" '{board: $boards}')" >> $GITHUB_OUTPUT
+          echo "nrf52840=$(jq -cn --argjson boards "$NRF52_BOARDS" '{board: $boards}')" >> $GITHUB_OUTPUT
+          echo "ESP32-S3 boards: $ESP32S3_BOARDS"
+          echo "nRF52840 boards: $NRF52_BOARDS"
+  build-esp32s3:
+    needs: setup
+    if: needs.setup.outputs.esp32s3 != '{"board":[]}'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.esp32s3) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Uncomment build epoch
+        run: sed -i 's/#-DBUILD_EPOCH=$UNIX_TIME/-DBUILD_EPOCH=$UNIX_TIME/' platformio.ini
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y update --fix-missing
+          sudo apt-get install -y cppcheck libbluetooth-dev libgpiod-dev libyaml-cpp-dev lsb-release
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+          cache: pip
+          cache-dependency-path: |
+            .github/actions/**
+            **.ini
+      - name: Upgrade python tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -U --no-build-isolation --no-cache-dir "setuptools<72"
+          pip install -U platformio adafruit-nrfutil --no-build-isolation
+          pip install -U poetry --no-build-isolation
+          pip install -U meshtastic --pre --no-build-isolation
+      - name: Upgrade platformio
+        run: pio upgrade
+
+      - name: Remove debug flags
+        run: sed -i '/DDEBUG_HEAP/d' ./arch/esp32/esp32s3.ini
+
+      - name: PlatformIO cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio/.cache
+          key: pio-cache-esp32s3-${{ hashFiles('.github/actions/**', '**.ini') }}
+
+      - name: Build ${{ matrix.board }}
+        run: bin/build-esp32.sh ${{ matrix.board }}
+
+      - name: Get version
+        id: version
+        run: echo "long=$(./bin/buildinfo.py long)" >> $GITHUB_OUTPUT
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.board }}-${{ steps.version.outputs.long }}
+          path: release/*.bin
+          retention-days: 1
+
+  build-nrf52:
+    needs: setup
+    if: needs.setup.outputs.nrf52840 != '{"board":[]}'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.nrf52840) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Uncomment build epoch
+        run: sed -i 's/#-DBUILD_EPOCH=$UNIX_TIME/-DBUILD_EPOCH=$UNIX_TIME/' platformio.ini
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y update --fix-missing
+          sudo apt-get install -y cppcheck libbluetooth-dev libgpiod-dev libyaml-cpp-dev lsb-release
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+          cache: pip
+          cache-dependency-path: |
+            .github/actions/**
+            **.ini
+      - name: Upgrade python tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -U --no-build-isolation --no-cache-dir "setuptools<72"
+          pip install -U platformio adafruit-nrfutil --no-build-isolation
+          pip install -U poetry --no-build-isolation
+          pip install -U meshtastic --pre --no-build-isolation
+      - name: Upgrade platformio
+        run: pio upgrade
+
+      - name: Remove debug flags
+        run: sed -i '/DDEBUG_HEAP/d' ./arch/nrf52/nrf52.ini
+
+      - name: PlatformIO cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio/.cache
+          key: pio-cache-nrf52840-${{ hashFiles('.github/actions/**', '**.ini') }}
+
+      - name: Build ${{ matrix.board }}
+        run: bin/build-nrf52.sh ${{ matrix.board }}
+
+      - name: Get version
+        id: version
+        run: echo "long=$(./bin/buildinfo.py long)" >> $GITHUB_OUTPUT
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.board }}-${{ steps.version.outputs.long }}
+          path: release/*.uf2
+          retention-days: 1
+
+  create-release:
+    needs: [build-esp32s3, build-nrf52]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(./bin/buildinfo.py long)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "name=DarkMesh Firmware ${VERSION}" >> $GITHUB_OUTPUT
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display artifacts
+        run: ls -R ./artifacts
+
+      - name: Create board-specific zips
+        run: |
+          mkdir -p ./release-zips
+          for board_dir in ./artifacts/*/; do
+            board_name=$(basename "$board_dir")
+            cd "$board_dir"
+            zip -r "../../release-zips/${board_name}.zip" *.bin *.uf2 2>/dev/null || true
+            cd - > /dev/null
+          done
+          ls -lh ./release-zips/
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ./release-zips/*.zip
