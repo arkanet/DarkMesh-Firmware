@@ -670,41 +670,6 @@ meshtastic_Routing_Error perhapsEncode(meshtastic_MeshPacket *p)
 
         size_t numbytes = pb_encode_to_bytes(bytes, sizeof(bytes), &meshtastic_Data_msg, &p->decoded);
 
-        /* Not actually used, so save the cycles
-        //  TODO: Allow modules to opt into compression.
-        if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
-
-            char original_payload[meshtastic_Constants_DATA_PAYLOAD_LEN];
-            memcpy(original_payload, p->decoded.payload.bytes, p->decoded.payload.size);
-
-            char compressed_out[meshtastic_Constants_DATA_PAYLOAD_LEN] = {0};
-
-            int compressed_len;
-            compressed_len = unishox2_compress_simple(original_payload, p->decoded.payload.size, compressed_out);
-
-            LOG_DEBUG("Original length - %d ", p->decoded.payload.size);
-            LOG_DEBUG("Compressed length - %d ", compressed_len);
-            LOG_DEBUG("Original message - %s ", p->decoded.payload.bytes);
-
-            // If the compressed length is greater than or equal to the original size, don't use the compressed form
-            if (compressed_len >= p->decoded.payload.size) {
-
-                LOG_DEBUG("Not using compressing message");
-                // Set the uncompressed payload variant anyway. Shouldn't hurt?
-                // p->decoded.which_payloadVariant = Data_payload_tag;
-
-                // Otherwise we use the compressor
-            } else {
-                LOG_DEBUG("Use compressed message");
-                // Copy the compressed data into the meshpacket
-
-                p->decoded.payload.size = compressed_len;
-                memcpy(p->decoded.payload.bytes, compressed_out, compressed_len);
-
-                p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP;
-            }
-        } */
-
         if (numbytes + MESHTASTIC_HEADER_LENGTH > MAX_LORA_PAYLOAD_LEN)
             return meshtastic_Routing_Error_TOO_LARGE;
 
