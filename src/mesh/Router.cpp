@@ -543,10 +543,12 @@ DecodeState perhapsDecode(meshtastic_MeshPacket *p)
 
                 memcpy(compressed_in, p->decoded.payload.bytes, compressed_len);
 
-                int decompressed_len = unishox2_decompress_simple(
+                const int decompressed_len = unishox2_decompress(
                     (const char *)compressed_in,
                     (int)compressed_len,
-                    (char *)decompressed_out
+                    (char *)decompressed_out,
+                    sizeof(decompressed_out),
+                    USX_PSET_DFLT
                 );
 
                 LOG_DEBUG("Decompressed length - %d", decompressed_len);
@@ -565,6 +567,7 @@ DecodeState perhapsDecode(meshtastic_MeshPacket *p)
                               (const char *)p->decoded.payload.bytes);
                     } else {
                         LOG_ERROR("Decompression failed: %d", decompressed_len);
+                        return DecodeState::DECODE_FAILURE;
                     }
             }
         }
