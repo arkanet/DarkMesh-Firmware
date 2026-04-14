@@ -23,7 +23,7 @@ int32_t StatusMessageModule::runOnce()
         service->sendToMesh(p);
     }
 
-    return 1000 * 12 * 60 * 60;
+    return 1000 * 4 * 60 * 60;
 }
 
 ProcessMessage StatusMessageModule::handleReceived(const meshtastic_MeshPacket &mp)
