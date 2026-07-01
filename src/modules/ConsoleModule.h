@@ -15,7 +15,7 @@ public:
         LOG_INFO("console module");
     }
 
-    static void sendText(NodeNum dest, ChannelIndex channel, const char *message, bool wantReplies);
+    static void sendText(NodeNum dest, ChannelIndex channel, const char *message, bool wantReplies, bool compressed = false);
     bool command_state=false;
 
 protected:
