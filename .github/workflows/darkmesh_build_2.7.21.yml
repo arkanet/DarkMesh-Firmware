@@ -1,4 +1,4 @@
-name: Test Release DarkMesh Firmware
+name: Build DarkMesh Firmware 2.7.21
 
 on:
   workflow_dispatch:
