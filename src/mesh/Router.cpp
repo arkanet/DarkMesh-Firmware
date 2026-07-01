@@ -667,9 +667,9 @@ meshtastic_Routing_Error perhapsEncode(meshtastic_MeshPacket *p)
                 }
             }
 #else
-            if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP) {
-                p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-            }
+            // if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP) {
+            //     p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+            // }
 #endif
         }
 

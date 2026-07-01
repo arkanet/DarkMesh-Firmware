@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //#define STEALTH_MODE 1
 #define DM_CONSOLE_MODULE 1
 #define DM_ZERO_COST_HOP_MODULE 1
-#define DM_USE_MESSAGE_COMPRESSION 1
+//#define DM_USE_MESSAGE_COMPRESSION 1
 
 // #define MESHTASTIC_MINIMIZE_BUILD 1
 #ifdef MESHTASTIC_MINIMIZE_BUILD
