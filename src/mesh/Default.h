@@ -37,10 +37,6 @@
 #endif
 #define default_network_ipv6_enabled false
 
-// Traffic management defaults
-#define default_traffic_mgmt_position_precision_bits 24         // ~10m grid cells
-#define default_traffic_mgmt_position_min_interval_secs ONE_DAY // 1 day between identical positions
-
 #define default_mqtt_address "mqtt.meshtastic.org"
 #define default_mqtt_username "meshdev"
 #define default_mqtt_password "large4cats"

@@ -4,6 +4,7 @@
 #include "MeshRadio.h"
 #include "MeshService.h"
 #include "NodeDB.h"
+#include "PositionPrecision.h"
 #include "RTC.h"
 
 #include "configuration.h"
@@ -372,6 +373,15 @@ ErrorCode Router::send(meshtastic_MeshPacket *p)
     }
 
     fixPriority(p); // Before encryption, fix the priority if it's unset
+    // Position precision is an originator-only privacy policy. Relays keep
+    // p->from as the original sender, so do not rewrite their POSITION_APP payload.
+    if (isFromUs(p)) {
+        if (!applyPositionPrecisionForChannel(*p, p->channel)) {
+            LOG_ERROR("Dropping malformed position packet before send");
+            packetPool.release(p);
+            return meshtastic_Routing_Error_BAD_REQUEST;
+        }
+    }
 
     // If the packet is not yet encrypted, do so now
     if (p->which_payload_variant == meshtastic_MeshPacket_decoded_tag) {
@@ -528,50 +538,25 @@ DecodeState perhapsDecode(meshtastic_MeshPacket *p)
         if (p->decoded.has_bitfield)
             p->decoded.want_response |= p->decoded.bitfield & BITFIELD_WANT_RESPONSE_MASK;
 
-#ifdef DM_USE_MESSAGE_COMPRESSION
-
+        /* Not actually ever used.
+        // Decompress if needed. jm
         if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP) {
-            LOG_WARN("DECODING COMPRESSED PACKET!");
+            // Decompress the payload
+            char compressed_in[meshtastic_Constants_DATA_PAYLOAD_LEN] = {};
+            char decompressed_out[meshtastic_Constants_DATA_PAYLOAD_LEN] = {};
+            int decompressed_len;
 
-            const size_t compressed_len = p->decoded.payload.size;
+            memcpy(compressed_in, p->decoded.payload.bytes, p->decoded.payload.size);
 
-            if (compressed_len == 0 || compressed_len > meshtastic_Constants_DATA_PAYLOAD_LEN) {
-                LOG_ERROR("Invalid compressed payload length: %u", (unsigned)compressed_len);
-            } else {
-                uint8_t compressed_in[meshtastic_Constants_DATA_PAYLOAD_LEN] = {0};
-                uint8_t decompressed_out[meshtastic_Constants_DATA_PAYLOAD_LEN] = {0};
+            decompressed_len = unishox2_decompress_simple(compressed_in, p->decoded.payload.size, decompressed_out);
 
-                memcpy(compressed_in, p->decoded.payload.bytes, compressed_len);
+            // LOG_DEBUG("**Decompressed length - %d ", decompressed_len);
 
-                const int decompressed_len = unishox2_decompress(
-                    (const char *)compressed_in,
-                    (int)compressed_len,
-                    (char *)decompressed_out,
-                    sizeof(decompressed_out),
-                    USX_PSET_DFLT
-                );
+            memcpy(p->decoded.payload.bytes, decompressed_out, decompressed_len);
 
-                LOG_DEBUG("Decompressed length - %d", decompressed_len);
-
-                if (decompressed_len > 0 &&
-                    decompressed_len <= meshtastic_Constants_DATA_PAYLOAD_LEN) {
-
-                    memcpy(p->decoded.payload.bytes, decompressed_out, (size_t)decompressed_len);
-                    p->decoded.payload.size = (size_t)decompressed_len;
-
-                    //we dont want to assign compresed messages as text, we want to detect them app-wise
-                    //p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-
-                    LOG_DEBUG("Decompressed message - %.*s",
-                              decompressed_len,
-                              (const char *)p->decoded.payload.bytes);
-                    } else {
-                        LOG_ERROR("Decompression failed: %d", decompressed_len);
-                        return DecodeState::DECODE_FAILURE;
-                    }
-            }
-        }
-#endif
+            // Switch the port from PortNum_TEXT_MESSAGE_COMPRESSED_APP to PortNum_TEXT_MESSAGE_APP
+            p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+        } */
 
         printPacket("decoded message", p);
 #if ENABLE_JSON_LOGGING
@@ -625,53 +610,44 @@ meshtastic_Routing_Error perhapsEncode(meshtastic_MeshPacket *p)
             p->decoded.has_bitfield = true;
             p->decoded.bitfield |= (config.lora.config_ok_to_mqtt << BITFIELD_OK_TO_MQTT_SHIFT);
             p->decoded.bitfield |= (p->decoded.want_response << BITFIELD_WANT_RESPONSE_SHIFT);
-
-            #ifdef DM_USE_MESSAGE_COMPRESSION
-            if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP) {
-
-                const size_t payload_len = p->decoded.payload.size;
-
-                // sanity check
-                if (payload_len == 0 || payload_len > meshtastic_Constants_DATA_PAYLOAD_LEN) {
-                    LOG_WARN("Invalid payload length for compression: %u", (unsigned)payload_len);
-                    p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-                } else {
-                    uint8_t original_payload[meshtastic_Constants_DATA_PAYLOAD_LEN] = {0};
-                    uint8_t compressed_out[meshtastic_Constants_DATA_PAYLOAD_LEN] = {0};
-
-                    memcpy(original_payload, p->decoded.payload.bytes, payload_len);
-
-                    int compressed_len = unishox2_compress_simple(
-                        (const char *)original_payload,
-                        (int)payload_len,
-                        (char *)compressed_out
-                    );
-
-                    LOG_DEBUG("Original length - %u", (unsigned)payload_len);
-                    LOG_DEBUG("Compressed length - %d", compressed_len);
-                    LOG_DEBUG("Original message - %.*s", (int)payload_len, (const char *)original_payload);
-
-                    // compression failed or not worth it
-                    if (compressed_len <= 0 || compressed_len >= (int)payload_len) {
-                        LOG_DEBUG("Not using compressed message");
-                        p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-                    } else {
-                        LOG_DEBUG("Using compressed message");
-
-                        memcpy(p->decoded.payload.bytes, compressed_out, (size_t)compressed_len);
-                        p->decoded.payload.size = (size_t)compressed_len;
-                        p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP;
-                    }
-                }
-            }
-#else
-            // if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP) {
-            //     p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
-            // }
-#endif
         }
 
         size_t numbytes = pb_encode_to_bytes(bytes, sizeof(bytes), &meshtastic_Data_msg, &p->decoded);
+
+        /* Not actually used, so save the cycles
+        //  TODO: Allow modules to opt into compression.
+        if (p->decoded.portnum == meshtastic_PortNum_TEXT_MESSAGE_APP) {
+
+            char original_payload[meshtastic_Constants_DATA_PAYLOAD_LEN];
+            memcpy(original_payload, p->decoded.payload.bytes, p->decoded.payload.size);
+
+            char compressed_out[meshtastic_Constants_DATA_PAYLOAD_LEN] = {0};
+
+            int compressed_len;
+            compressed_len = unishox2_compress_simple(original_payload, p->decoded.payload.size, compressed_out);
+
+            LOG_DEBUG("Original length - %d ", p->decoded.payload.size);
+            LOG_DEBUG("Compressed length - %d ", compressed_len);
+            LOG_DEBUG("Original message - %s ", p->decoded.payload.bytes);
+
+            // If the compressed length is greater than or equal to the original size, don't use the compressed form
+            if (compressed_len >= p->decoded.payload.size) {
+
+                LOG_DEBUG("Not using compressing message");
+                // Set the uncompressed payload variant anyway. Shouldn't hurt?
+                // p->decoded.which_payloadVariant = Data_payload_tag;
+
+                // Otherwise we use the compressor
+            } else {
+                LOG_DEBUG("Use compressed message");
+                // Copy the compressed data into the meshpacket
+
+                p->decoded.payload.size = compressed_len;
+                memcpy(p->decoded.payload.bytes, compressed_out, compressed_len);
+
+                p->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_COMPRESSED_APP;
+            }
+        } */
 
         if (numbytes + MESHTASTIC_HEADER_LENGTH > MAX_LORA_PAYLOAD_LEN)
             return meshtastic_Routing_Error_TOO_LARGE;
@@ -775,9 +751,13 @@ void Router::handleReceived(meshtastic_MeshPacket *p, RxSource src)
     // Also, we should set the time from the ISR and it should have msec level resolution
     p->rx_time = getValidTime(RTCQualityFromNet); // store the arrival timestamp for the phone
 
-    // Store a copy of encrypted packet for MQTT
+    // Store a copy of the encrypted packet for MQTT.
+    // Local, not a class member: handleReceived re-enters itself when a module
+    // reply broadcast goes through MeshService::sendToMesh -> Router::sendLocal,
+    // and a member would be silently overwritten without release on the inner
+    // call. Each invocation now owns its own copy (issue #9632, #10101, #8729).
     DEBUG_HEAP_BEFORE;
-    p_encrypted = packetPool.allocCopy(*p);
+    meshtastic_MeshPacket *p_encrypted = packetPool.allocCopy(*p);
     DEBUG_HEAP_AFTER("Router::handleReceived", p_encrypted);
 
     // Take those raw bytes and convert them back into a well structured protobuf we can understand
@@ -871,8 +851,7 @@ void Router::handleReceived(meshtastic_MeshPacket *p, RxSource src)
 #endif
     }
 
-    packetPool.release(p_encrypted); // Release the encrypted packet
-    p_encrypted = nullptr;
+    packetPool.release(p_encrypted); // Release the encrypted packet (release() handles nullptr)
 }
 
 void Router::perhapsHandleReceived(meshtastic_MeshPacket *p)
