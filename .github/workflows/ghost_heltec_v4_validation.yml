@@ -1,4 +1,4 @@
-name: Ghost HELTEC V4 validation
+name: Ghost cross-platform validation
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ghost-v4-${{ github.ref }}
+  group: ghost-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,12 +19,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run targeted source checks
+      - name: Run targeted regression checks
         run: python3 -m unittest discover -s tests/ghost -p 'test_*.py' -v
 
-  firmware-heltec-v4:
-    name: Compile HELTEC V4
-    needs: source-regressions
+  discover:
+    name: Discover supported firmware boards
+    runs-on: ubuntu-latest
+    outputs:
+      boards: ${{ steps.matrix.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: python3 -m pip install platformio
+      - id: matrix
+        name: Read all release-level boards across architectures
+        shell: bash
+        run: |
+          echo "boards=$(python3 bin/generate_ci_matrix.py all)" >> "$GITHUB_OUTPUT"
+
+  firmware-build:
+    name: Build ${{ matrix.board.board }} (${{ matrix.board.platform }})
+    needs: [source-regressions, discover]
+    if: ${{ needs.discover.outputs.boards != '[]' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        board: ${{ fromJson(needs.discover.outputs.boards) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,12 +59,21 @@ jobs:
           python-version: '3.11'
       - name: Install PlatformIO
         run: python3 -m pip install platformio
-      - name: Compile firmware (without flashing or publishing)
-        run: pio run -e heltec-v4
-      - name: Retain private test build as a workflow artifact
+      - name: Compile firmware (no flashing or release)
+        run: pio run -e "${{ matrix.board.board }}"
+      - name: Verify and enumerate generated firmware images
+        shell: bash
+        run: |
+          find ".pio/build/${{ matrix.board.board }}" -maxdepth 1 -type f \\( -name 'firmware*.bin' -o -name 'firmware*.uf2' -o -name 'firmware*.hex' -o -name 'firmware*.zip' \\) -print
+          test -n "$(find ".pio/build/${{ matrix.board.board }}" -maxdepth 1 -type f \\( -name 'firmware*.bin' -o -name 'firmware*.uf2' -o -name 'firmware*.hex' -o -name 'firmware*.zip' \\) -print -quit)"
+      - name: Save firmware for hardware testing
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-heltec-v4-${{ github.sha }}
-          path: .pio/build/heltec-v4/firmware.bin
+          name: ghost-${{ matrix.board.board }}-${{ github.sha }}
+          path: |
+            .pio/build/${{ matrix.board.board }}/firmware*.bin
+            .pio/build/${{ matrix.board.board }}/firmware*.uf2
+            .pio/build/${{ matrix.board.board }}/firmware*.hex
+            .pio/build/${{ matrix.board.board }}/firmware*.zip
           if-no-files-found: error
           retention-days: 7
