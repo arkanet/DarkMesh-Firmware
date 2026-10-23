@@ -4,7 +4,6 @@ These tests cannot replace a compiled firmware build and three-node RF verificat
 Run: python3 -m unittest discover -s tests/ghost -p 'test_*.py' -v
 """
 from pathlib import Path
-import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,9 +27,9 @@ class GhostSourceRegression(unittest.TestCase):
         self.assertLess(mirror, filter_begin)
 
     def test_single_delivery_other_roles_unchanged(self):
-        self.assertRegex(
+        self.assertIn(
+            "if (!ghostCapture && (isBroadcast(mp.to) || isToUs(&mp)) && (mp.from != 0))",
             ROUTING,
-            r"if \\(!ghostCapture && \\(isBroadcast\\(mp\\.to\\) \\|\\| isToUs\\(&mp\\)\\) && \\(mp\\.from != 0\\)\\)",
         )
         self.assertEqual(ROUTING.count("service->handleFromRadio(&mp);"), 2)
 
