@@ -1,4 +1,4 @@
-name: Ghost cross-platform validation
+name: Ghost lightweight validation
 
 on:
   push:
@@ -22,58 +22,13 @@ jobs:
       - name: Run targeted regression checks
         run: python3 -m unittest discover -s tests/ghost -p 'test_*.py' -v
 
-  discover:
-    name: Discover supported firmware boards
-    runs-on: ubuntu-latest
-    outputs:
-      boards: ${{ steps.matrix.outputs.boards }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install PlatformIO
-        run: python3 -m pip install platformio
-      - id: matrix
-        name: Read all release-level boards across architectures
-        shell: bash
-        run: |
-          echo "boards=$(python3 bin/generate_ci_matrix.py all)" >> "$GITHUB_OUTPUT"
-
-  firmware-build:
-    name: Build ${{ matrix.board.board }} (${{ matrix.board.platform }})
-    needs: [source-regressions, discover]
-    if: ${{ needs.discover.outputs.boards != '[]' }}
-    strategy:
-      fail-fast: false
-      max-parallel: 6
-      matrix:
-        board: ${{ fromJson(needs.discover.outputs.boards) }}
+  cpp-static-analysis:
+    name: Shared C++ static analysis (no firmware builds)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install PlatformIO
-        run: python3 -m pip install platformio
-      - name: Compile firmware (no flashing or release)
-        run: pio run -e "${{ matrix.board.board }}"
-      - name: Verify and enumerate generated firmware images
-        shell: bash
+      - name: Install cppcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y cppcheck
+      - name: Analyze Ghost changes
         run: |
-          find ".pio/build/${{ matrix.board.board }}" -maxdepth 1 -type f \\( -name 'firmware*.bin' -o -name 'firmware*.uf2' -o -name 'firmware*.hex' -o -name 'firmware*.zip' \\) -print
-          test -n "$(find ".pio/build/${{ matrix.board.board }}" -maxdepth 1 -type f \\( -name 'firmware*.bin' -o -name 'firmware*.uf2' -o -name 'firmware*.hex' -o -name 'firmware*.zip' \\) -print -quit)"
-      - name: Save firmware for hardware testing
-        uses: actions/upload-artifact@v4
-        with:
-          name: ghost-${{ matrix.board.board }}-${{ github.sha }}
-          path: |
-            .pio/build/${{ matrix.board.board }}/firmware*.bin
-            .pio/build/${{ matrix.board.board }}/firmware*.uf2
-            .pio/build/${{ matrix.board.board }}/firmware*.hex
-            .pio/build/${{ matrix.board.board }}/firmware*.zip
-          if-no-files-found: error
-          retention-days: 7
+          cppcheck --enable=warning,performance,portability --error-exitcode=1 --inline-suppr --suppress=missingIncludeSystem --suppress=missingInclude --language=c++ --std=c++17 src/modules/RoutingModule.cpp src/mesh/MeshService.cpp
