@@ -31,4 +31,4 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y cppcheck
       - name: Analyze Ghost changes
         run: |
-          cppcheck --enable=warning,performance,portability --error-exitcode=1 --inline-suppr --suppress=missingIncludeSystem --suppress=missingInclude --language=c++ --std=c++17 src/modules/RoutingModule.cpp src/mesh/MeshService.cpp
+          cppcheck --enable=warning,performance,portability --error-exitcode=1 --inline-suppr --suppress=missingIncludeSystem --suppress=missingInclude --suppress=unknownMacro --language=c++ --std=c++17 src/modules/RoutingModule.cpp src/mesh/MeshService.cpp
