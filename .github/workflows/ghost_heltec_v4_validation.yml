@@ -1,0 +1,46 @@
+name: Ghost HELTEC V4 validation
+
+on:
+  push:
+    branches:
+      - 2.7.26-darkmesh-ghost
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ghost-v4-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-regressions:
+    name: Ghost source regression guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run targeted source checks
+        run: python3 -m unittest discover -s tests/ghost -p 'test_*.py' -v
+
+  firmware-heltec-v4:
+    name: Compile HELTEC V4
+    needs: source-regressions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: python3 -m pip install platformio
+      - name: Compile firmware (without flashing or publishing)
+        run: pio run -e heltec-v4
+      - name: Retain private test build as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-heltec-v4-${{ github.sha }}
+          path: .pio/build/heltec-v4/firmware.bin
+          if-no-files-found: error
+          retention-days: 7
