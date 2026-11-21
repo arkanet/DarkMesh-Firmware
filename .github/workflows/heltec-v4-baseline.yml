@@ -24,13 +24,29 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - name: Prepare PlatformIO
+      - name: Prepare isolated PlatformIO and Python environment
         shell: bash
         run: |
+          set -euo pipefail
+          # Cache tools per repository, away from other self-hosted runners.
+          # This directory survives checkout and subsequent workflow runs.
+          core_dir="$(dirname "$GITHUB_WORKSPACE")/.platformio-core-darkmesh"
+          mkdir -p "$core_dir"
+          echo "PLATFORMIO_CORE_DIR=$core_dir" >> "$GITHUB_ENV"
+          # Use the public Python index for the ESP32 tool's cryptography wheel.
+          echo "PIP_INDEX_URL=https://pypi.org/simple" >> "$GITHUB_ENV"
+          echo "PIP_DEFAULT_TIMEOUT=90" >> "$GITHUB_ENV"
+          echo "PIP_RETRIES=5" >> "$GITHUB_ENV"
           python3 -m venv "$RUNNER_TEMP/pio-venv"
           "$RUNNER_TEMP/pio-venv/bin/python" -m pip install --upgrade pip
           "$RUNNER_TEMP/pio-venv/bin/python" -m pip install 'platformio>=6.2.0,<7'
           echo "$RUNNER_TEMP/pio-venv/bin" >> "$GITHUB_PATH"
+      - name: Check cryptography wheel availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip download --only-binary=:all: --no-deps \
+            --dest "$RUNNER_TEMP/esp-python-check" 'cryptography~=46.0.0'
       - name: Compile existing Heltec V4 TFT baseline
         shell: bash
         run: |
