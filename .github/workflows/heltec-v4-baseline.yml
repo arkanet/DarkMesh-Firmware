@@ -1,0 +1,55 @@
+name: DarkMesh 2.7.26 Heltec V4 baseline
+on:
+  push:
+    branches:
+      - 'TFT-SPI-480x320-2.7.26'
+    paths:
+      - '.github/workflows/heltec-v4-baseline.yml'
+      - 'src/**'
+      - 'lib/**'
+      - 'variants/**'
+      - 'platformio.ini'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: darkmesh-heltec-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  compile:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Prepare PlatformIO
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pio-venv"
+          "$RUNNER_TEMP/pio-venv/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/pio-venv/bin/python" -m pip install 'platformio>=6.2.0,<7'
+          echo "$RUNNER_TEMP/pio-venv/bin" >> "$GITHUB_PATH"
+      - name: Compile existing Heltec V4 TFT baseline
+        shell: bash
+        run: |
+          set -o pipefail
+          pio run -e heltec-v4-tft 2>&1 | tee firmware-build.log
+      - name: Save logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: darkmesh-v4-baseline-log
+          path: firmware-build.log
+          if-no-files-found: ignore
+      - name: Save firmware
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: darkmesh-v4-baseline-firmware
+          path: |
+            .pio/build/heltec-v4-tft/*.bin
+            .pio/build/heltec-v4-tft/*.elf
+            .pio/build/heltec-v4-tft/*.map
+          if-no-files-found: warn
