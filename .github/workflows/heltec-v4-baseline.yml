@@ -2,7 +2,7 @@ name: DarkMesh 2.7.26 Heltec V4 baseline
 on:
   push:
     branches:
-      - 'TFT-SPI-480x320-2.7.26'
+      - 'TFT-SPI-480x320'
     paths:
       - '.github/workflows/heltec-v4-baseline.yml'
       - 'src/**'
