@@ -29,22 +29,56 @@ class BuildEnv:
 
 
 class SourceNode:
-    def __init__(self, path):
+    def __init__(self, path, source=None):
         self.path = path
+        self.source = source or path
 
     def get_abspath(self):
         return self.path
+
+    def srcnode(self):
+        return SourceNode(self.source)
 
 
 build_env = BuildEnv()
 scope = {"env": build_env, "Import": lambda name: None}
 exec((ROOT / "extra_scripts/heltec_v4_r2_storage.py").read_text(), scope)
 for replaced in scope["REPLACED"]:
-    node = SourceNode("/repo/.pio/libdeps/p04/meshtastic-device-ui/" + replaced)
+    node = SourceNode(
+        "/repo/.pio/build/p04/lib34f/meshtastic-device-ui/" + replaced,
+        "/repo/.pio/libdeps/p04/meshtastic-device-ui/" + replaced,
+    )
     assert build_env.middleware(node) is None
     node = SourceNode("/repo/src/" + replaced)
     assert build_env.middleware(node) is node
 print("P04 native storage substitution, without dependency edits: PASS")
+
+# Real SCons nodes distinguish the build path from the library source path.
+from SCons.Script import Environment
+
+scons_env = Environment(tools=[])
+scons_env["PIOENV"] = "heltec-v4-r2-ili9488-p04"
+callbacks = []
+scons_env.AddMethod(
+    lambda env, callback: callbacks.append(callback), "AddBuildMiddleware"
+)
+scons_scope = {"env": scons_env, "Import": lambda name: None}
+exec((ROOT / "extra_scripts/heltec_v4_r2_storage.py").read_text(), scons_scope)
+with tempfile.TemporaryDirectory(prefix="heltec-scons-") as tmp:
+    source_dir = Path(tmp) / ".pio/libdeps/p04/meshtastic-device-ui"
+    build_dir = Path(tmp) / ".pio/build/p04/lib123/meshtastic-device-ui"
+    for replaced in scons_scope["REPLACED"]:
+        path = source_dir / replaced
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("int test;\n")
+    scons_env.VariantDir(str(build_dir), str(source_dir), duplicate=0)
+    for replaced in scons_scope["REPLACED"]:
+        node = scons_env.File(str(build_dir / replaced))
+        assert ".pio/build/" in node.get_abspath()
+        assert ".pio/libdeps/" in node.srcnode().get_abspath()
+        assert callbacks[0](node) is None
+print("Actual SCons VariantDir native storage selection: PASS")
+
 
 ARDUINO = r"""
 #pragma once

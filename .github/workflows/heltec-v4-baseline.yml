@@ -51,7 +51,7 @@ jobs:
           echo "PIP_RETRIES=5" >> "$GITHUB_ENV"
           python3 -m venv "$RUNNER_TEMP/pio-venv"
           "$RUNNER_TEMP/pio-venv/bin/python" -m pip install --upgrade pip
-          "$RUNNER_TEMP/pio-venv/bin/python" -m pip install 'platformio>=6.2.0,<7'
+          "$RUNNER_TEMP/pio-venv/bin/python" -m pip install 'platformio>=6.2.0,<7' 'scons>=4.8,<5'
           echo "$RUNNER_TEMP/pio-venv/bin" >> "$GITHUB_PATH"
       - name: Check cryptography wheel availability
         shell: bash
