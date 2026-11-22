@@ -157,7 +157,9 @@ class SdFs {
 public:
   int begins = 0, ends = 0;
   bool beginOk = false, ready = false, live = false;
-  bool begin(const SdSpiConfig&) { ++begins; live = beginOk; return beginOk; }
+  uint8_t sdError = 0;
+  uint8_t sdErrorCode() { return sdError; }
+  bool begin(const SdSpiConfig&) { ++begins; live = beginOk; sdError = 0; return beginOk; }
   void end() { ++ends; live = false; }
   Card* card() { return live && ready ? &cardObject : nullptr; }
   uint8_t fatType() { return live && ready ? FAT_TYPE_FAT32 : 0; }
@@ -234,6 +236,11 @@ int main() {
 #endif
   assert(card.begins == 3 && card.ends == 2);
   assert(SPI.begins == 0 && SPI.ends == 0);
+#ifndef TEST_MODERN
+  card.sdError = 1;
+  assert(storage.cardType() == ISdCard::eNone);
+  assert(attempt() && card.begins == 4); // cached FAT/type cannot mask a low-level read error
+#endif
   HeltecSdRetry retry;
   nowMs = 0;
   retry.failure();

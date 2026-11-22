@@ -15,7 +15,7 @@ bool mounted = false;
 
 bool cardReady()
 {
-    return mounted && SDFs.card() && SDFs.fatType() != 0;
+    return mounted && SDFs.card() && SDFs.fatType() != 0 && SDFs.sdErrorCode() == 0;
 }
 } // namespace
 
