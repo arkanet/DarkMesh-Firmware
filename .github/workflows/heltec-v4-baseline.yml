@@ -8,6 +8,8 @@ on:
       - 'src/**'
       - 'lib/**'
       - 'variants/**'
+      - 'bin/test-heltec-v4-r2.py'
+      - 'extra_scripts/heltec_v4_r2_storage.py'
       - 'platformio.ini'
   workflow_dispatch:
 permissions:
@@ -17,6 +19,16 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compile:
+    name: ${{ matrix.pio_env }} (compile-only)
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        pio_env:
+          - heltec-v4-r2-ili9488-p04
+          - heltec-v4-r2-ili9488-p03
+          - heltec-v4-r2-ili9488-p02
+          - heltec-v4-tft
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 120
     steps:
@@ -47,25 +59,32 @@ jobs:
           set -euo pipefail
           python -m pip download --only-binary=:all: --no-deps \
             --dest "$RUNNER_TEMP/esp-python-check" 'cryptography~=46.0.0'
-      - name: Compile existing Heltec V4 TFT baseline
+      - name: Test production P04 storage and GPIO contracts
+        if: matrix.pio_env == 'heltec-v4-r2-ili9488-p04'
+        run: python3 bin/test-heltec-v4-r2.py
+      - name: Compile ${{ matrix.pio_env }} (NO FLASH)
+        env:
+          PIO_ENV: ${{ matrix.pio_env }}
         shell: bash
         run: |
           set -o pipefail
-          pio run -e heltec-v4-tft 2>&1 | tee firmware-build.log
+          pio run -j 2 -e "$PIO_ENV" 2>&1 | tee firmware-build.log
       - name: Save logs
         if: always()
+        continue-on-error: true
+        timeout-minutes: 3
         uses: actions/upload-artifact@v4
         with:
-          name: darkmesh-v4-baseline-log
+          name: ${{ matrix.pio_env }}-build-log
           path: firmware-build.log
-          if-no-files-found: ignore
-      - name: Save firmware
+          if-no-files-found: warn
+      - name: Save firmware for review (DO NOT FLASH)
         if: success()
+        continue-on-error: true
+        timeout-minutes: 3
         uses: actions/upload-artifact@v4
         with:
-          name: darkmesh-v4-baseline-firmware
-          path: |
-            .pio/build/heltec-v4-tft/*.bin
-            .pio/build/heltec-v4-tft/*.elf
-            .pio/build/heltec-v4-tft/*.map
+          name: ${{ matrix.pio_env }}-compile-only-firmware
+          path: .pio/build/${{ matrix.pio_env }}/*.bin
+          compression-level: 0
           if-no-files-found: warn

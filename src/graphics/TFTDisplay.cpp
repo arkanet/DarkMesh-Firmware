@@ -22,7 +22,12 @@ uint16_t TFT_MESH = TFT_MESH_OVERRIDE;
 uint16_t TFT_MESH = COLOR565(0x67, 0xEA, 0x94);
 #endif
 
-#if defined(ST7735S)
+#if defined(HELTEC_V4_R2_ILI9488)
+#include "graphics/LGFX/LGFX_GENERIC.h"
+using LGFX = LGFX_GENERIC;
+static LGFX *tft = nullptr;
+
+#elif defined(ST7735S)
 #include <LovyanGFX.hpp> // Graphics and font library for ST7735 driver chip
 
 #ifndef TFT_INVERT

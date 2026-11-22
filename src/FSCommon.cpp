@@ -381,6 +381,9 @@ void fsInit()
  */
 void setupSDCard()
 {
+#if defined(HELTEC_V4_R2_P04)
+    return; // The UI is the sole owner of the map card's filesystem.
+#endif
 #if defined(HAS_SDCARD) && !defined(SDCARD_USE_SOFT_SPI)
     concurrency::LockGuard g(spiLock);
     SDHandler.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
