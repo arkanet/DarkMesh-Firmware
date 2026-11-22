@@ -16,7 +16,7 @@ permissions:
   contents: read
 concurrency:
   group: darkmesh-heltec-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   compile:
     name: ${{ matrix.pio_env }} (compile-only)

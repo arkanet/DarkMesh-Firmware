@@ -318,6 +318,7 @@ for suffix in ("p02", "p03", "p04"):
     ):
         assert conflict not in flags, (suffix, conflict)
     assert ("LGFX_TOUCH=XPT2046" in flags) == (suffix != "p02")
+    assert flags.count("HAS_TOUCHSCREEN=") == int(suffix != "p02"), suffix
     assert ("HAS_SDCARD=1" in flags) == (suffix == "p04")
     unflags = env["build_unflags"]
     assert "gnu++11" in str(unflags)
