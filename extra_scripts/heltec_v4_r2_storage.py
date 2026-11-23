@@ -6,7 +6,10 @@ Import("env")
 if env["PIOENV"] != "heltec-v4-r2-ili9488-p04":
     raise RuntimeError("P04 storage adapter selected outside its opt-in environment")
 
-REPLACED = ("source/graphics/common/SdCard.cpp",)
+REPLACED = (
+    "source/graphics/common/SdCard.cpp",
+    "source/graphics/map/SdFatService.cpp",
+)
 
 
 def board_storage_only(node):

@@ -9,6 +9,8 @@ on:
       - 'lib/**'
       - 'variants/**'
       - 'bin/test-heltec-v4-r2.py'
+      - 'bin/test-heltec-pmtiles.py'
+      - 'test/heltec_pmtiles/**'
       - 'extra_scripts/heltec_v4_r2_storage.py'
       - 'platformio.ini'
   workflow_dispatch:
@@ -62,6 +64,9 @@ jobs:
       - name: Test production P04 storage and GPIO contracts
         if: matrix.pio_env == 'heltec-v4-r2-ili9488-p04'
         run: python3 bin/test-heltec-v4-r2.py
+      - name: Test PMTiles archives and production SdFat bridge
+        if: matrix.pio_env == 'heltec-v4-r2-ili9488-p04'
+        run: python3 bin/test-heltec-pmtiles.py
       - name: Compile ${{ matrix.pio_env }} (NO FLASH)
         env:
           PIO_ENV: ${{ matrix.pio_env }}

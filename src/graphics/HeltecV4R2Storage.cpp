@@ -12,12 +12,18 @@ namespace
 {
 HeltecSdRetry retry;
 bool mounted = false;
+uint32_t generation = 0;
 
 bool cardReady()
 {
     return mounted && SDFs.card() && SDFs.fatType() != 0 && SDFs.sdErrorCode() == 0;
 }
 } // namespace
+
+uint32_t heltecSdGeneration()
+{
+    return generation;
+}
 
 bool SdFsCard::init()
 {
@@ -27,6 +33,8 @@ bool SdFsCard::init()
         return false;
     mounted = SDFs.begin(SdSpiConfig(SDCARD_CS, SHARED_SPI | USER_SPI_BEGIN, SD_SPI_FREQUENCY, &SPI));
     if (cardReady()) {
+        ++generation;
+        updated = false;
         retry.success();
         return true;
     }
@@ -63,7 +71,8 @@ ISdCard::FatType SdFsCard::fatType()
 
 ISdCard::ErrorType SdFsCard::errorType()
 {
-    // The legacy UI offers formatting for FormatError/NoMbrError; P04 must never erase.
+    // The legacy UI offers formatting for FormatError/NoMbrError; P04 must never
+    // erase.
     return cardReady() ? ErrorType::eNoError : ErrorType::eCardError;
 }
 
