@@ -3,6 +3,9 @@
 // 2043d07d34e11134261edef3f1080599b9e544fc.
 #if defined(HELTEC_V4_R2_P04) || defined(HELTEC_PMTILES_HOST)
 #include "PmTiles.h"
+#if defined(HELTEC_V4_R2_P04)
+#include "lvgl.h"
+#endif
 
 #include <cstring>
 #include <limits>
@@ -80,11 +83,8 @@ void *allocBuffer(size_t bytes)
 {
     if (bytes == 0)
         return nullptr;
-#if defined(ESP32)
-    void *p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p && bytes <= 16u * 1024u)
-        p = heap_caps_malloc(bytes, MALLOC_CAP_8BIT);
-    return p;
+#if defined(HELTEC_V4_R2_P04)
+    return lv_malloc(bytes);
 #else
     return std::malloc(bytes);
 #endif
@@ -94,8 +94,8 @@ void freeBuffer(void *p)
 {
     if (!p)
         return;
-#if defined(ESP32)
-    heap_caps_free(p);
+#if defined(HELTEC_V4_R2_P04)
+    lv_free(p);
 #else
     std::free(p);
 #endif

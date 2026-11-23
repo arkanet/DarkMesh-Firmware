@@ -36,7 +36,9 @@ existing write behavior.
 The bounded reader is adapted from WadaMesh commit
 `2043d07d34e11134261edef3f1080599b9e544fc`, under GPL-3.0-or-later. It checks section
 bounds, directory counts, varint overflow, leaf traversal depth and gzip CRC/size.
-Directory allocations prefer PSRAM. Encoded tile size is capped at 256 KiB and PNG
+Directory and encoded tile allocations use DarkMesh's existing LVGL PSRAM pool,
+preserving the separate 450 kB PNG decoder arena on the 2 MB R2 board.
+Encoded tile size is capped at 256 KiB and PNG
 dimensions must match the map's configured tile size before decoding.
 
 No archive handle survives a tile request or a card remount. Cached directories

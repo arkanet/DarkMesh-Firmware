@@ -2,6 +2,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+inline bool lv_fail_allocations = false;
+inline size_t lv_malloc_calls = 0;
+inline void *lv_malloc(size_t bytes)
+{
+    ++lv_malloc_calls;
+    return lv_fail_allocations ? nullptr : malloc(bytes);
+}
 struct lv_img_dsc_t {
     const uint8_t *data;
 };

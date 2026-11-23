@@ -7,10 +7,6 @@
 #include <cstdint>
 #include <cstdlib>
 
-#if defined(ESP32)
-#include <esp_heap_caps.h>
-#endif
-
 namespace PmTiles
 {
 
@@ -49,8 +45,7 @@ struct Entry {
     uint32_t run_length;
 };
 
-// PSRAM first. Internal RAM only for small blocks: a directory must never be
-// what starves the internal heap that Wi-Fi and the radio live on.
+// Use DarkMesh's existing LVGL PSRAM pool, preserving the separate PNG arena.
 void *allocBuffer(size_t bytes);
 void freeBuffer(void *p);
 

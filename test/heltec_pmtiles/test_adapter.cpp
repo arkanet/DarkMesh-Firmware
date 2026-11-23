@@ -68,6 +68,12 @@ int main(int argc, char **argv)
     install("raster_root");
     assert(load("/maps/darkmesh/0/0/0.png"));
     const auto rootBytes = decodedBytes;
+    assert(lv_malloc_calls > 0);
+    ++generation;
+    lv_fail_allocations = true;
+    assert(!load("/maps/darkmesh/0/0/0.png"));
+    lv_fail_allocations = false;
+    assert(load("/maps/darkmesh/0/0/0.png"));
     assert(!colorDecoded);
     MapTileSettings::colored = true;
     assert(load("/maps/darkmesh/0/0/0.png") && colorDecoded);
