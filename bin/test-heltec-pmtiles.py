@@ -2,9 +2,9 @@
 """Exercise the production reader and SdFat bridge; no device or network needed."""
 
 import os
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST = ROOT / "test/heltec_pmtiles"

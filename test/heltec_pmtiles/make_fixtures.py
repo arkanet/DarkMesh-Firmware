@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Write PMTiles v3 test archives for test/heltec_pmtiles/test_reader.cpp.
 
 Everything is written here from the v3 spec (no pmtiles package, no network):
@@ -16,7 +15,6 @@ Also writes <out_dir>/sd/maps/<name>/<name>.pmtiles copies for a card image.
 """
 
 import gzip
-import io
 import os
 import struct
 import sys
@@ -172,7 +170,7 @@ def build(
     tile_type=2,
     leaf_size=None,
     clustered=True,
-    gz_kwargs=None
+    gz_kwargs=None,
 ):
     """tiles: {(z, x, y): bytes}. Returns (archive bytes, expect lines)."""
     by_id = sorted(
@@ -239,20 +237,20 @@ def build(
     assert len(header) == 127, len(header)
     archive = bytes(header) + root + meta + bytes(leaves) + bytes(blob)
     expect = [
-        "%d %d %d %d %d" % (z, x, y, len(d), zlib.crc32(d) & 0xFFFFFFFF)
+        f"{z} {x} {y} {len(d)} {zlib.crc32(d) & 0xFFFFFFFF}"
         for _, (z, x, y), d in by_id
     ]
     return (
         archive,
         expect,
-        dict(
-            root_off=root_off,
-            root_len=len(root),
-            leaf_off=leaf_off,
-            leaf_len=len(leaves),
-            data_off=data_off,
-            data_len=len(blob),
-        ),
+        {
+            "root_off": root_off,
+            "root_len": len(root),
+            "leaf_off": leaf_off,
+            "leaf_len": len(leaves),
+            "data_off": data_off,
+            "data_len": len(blob),
+        },
     )
 
 
@@ -320,7 +318,12 @@ def main():
         world(0, 2),
         min_z=0,
         max_z=2,
-        gz_kwargs=dict(name=b"dir.bin", extra=b"xy\x02\x00ab", comment=b"c", hcrc=True),
+        gz_kwargs={
+            "name": b"dir.bin",
+            "extra": b"xy\x02\x00ab",
+            "comment": b"c",
+            "hcrc": True,
+        },
     )
     put("raster_gzip_fields", gzf, exp_gzf)
 
@@ -477,7 +480,7 @@ def main():
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "vector.pmtiles"), "wb") as f:
         f.write(written["vector_mvt"])
-    print("make_fixtures: %d archives in %s" % (len(written), out))
+    print(f"make_fixtures: {len(written)} archives in {out}")
 
 
 if __name__ == "__main__":
